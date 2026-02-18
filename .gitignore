@@ -1,0 +1,8 @@
+.tmp/
+__pycache__/
+*.pyc
+.env
+gdrive_token.json
+client_secret_*.json
+*.mp4
+*.mp3
