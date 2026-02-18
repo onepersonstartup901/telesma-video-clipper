@@ -13,35 +13,79 @@ Video-to-Clips pipeline that turns long-form video into short viral clips.
 - **Resume-safe** — state tracked in `state.json`, skips completed steps on re-run
 - **Original or vertical (9:16)** aspect ratio cuts
 
-## Setup
+## First-Time Setup (macOS)
+
+### 1. Install system dependencies
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Install Homebrew (skip if you already have it)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# Copy and fill in your API keys
-cp .env.example .env
-
-# Place your Google Cloud OAuth client secret JSON in this directory
-# (filename must match: client_secret_*.json)
-
-# Test everything works
-python video_clipper.py --dry-run
+# Install Python, ffmpeg, and Node.js
+brew install python@3.12 ffmpeg node
 ```
 
-### Google Drive OAuth
+### 2. Clone and set up the project
 
-1. Create a project in [Google Cloud Console](https://console.cloud.google.com/)
-2. Enable the Google Drive API
-3. Create an OAuth 2.0 Client ID (Desktop app)
-4. Download the client secret JSON into this directory
-5. On first run, a browser window will open for OAuth consent
+```bash
+git clone https://github.com/onepersonstartup901/telesma-video-clipper.git
+cd telesma-video-clipper
 
-### Telegram Bot (optional)
+# Create virtual environment and install Python packages
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+### 3. API keys
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and fill in your `ASSEMBLYAI_API_KEY` (get one free at [assemblyai.com/dashboard](https://www.assemblyai.com/dashboard) — $50 free credits = ~333 hours of transcription).
+
+### 4. Google Drive OAuth
+
+You should have received a `client_secret_*.json` file. Place it in this directory (the repo root). The filename must match the pattern `client_secret_*.json`.
+
+Then run a dry-run to trigger the browser OAuth consent:
+
+```bash
+.venv/bin/python video_clipper.py --dry-run
+```
+
+A browser window will open asking you to authorize Google Drive access. After you approve, a `gdrive_token.json` is saved locally and you won't need to do this again.
+
+### 5. Install Claude Code (for AI clip selection)
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+Then open Claude Code inside the project:
+
+```bash
+cd telesma-video-clipper
+claude
+```
+
+The `/clip` slash command is auto-detected from `.claude/commands/clip.md`. Type `/clip` after transcribing a video to interactively identify viral moments.
+
+### 6. Telegram Bot (optional)
+
+Pipeline notifications via Telegram. Skip this if you don't need them — the pipeline works without it.
 
 1. Create a bot via [@BotFather](https://t.me/BotFather)
 2. Get your chat ID via [@userinfobot](https://t.me/userinfobot)
 3. Add `VIDEO_CLIPPER_BOT_TOKEN` and `VIDEO_CLIPPER_CHAT_ID` to `.env`
+
+### 7. Verify everything works
+
+```bash
+.venv/bin/python video_clipper.py --dry-run
+```
+
+You should see confirmation that OAuth, ffmpeg, and (optionally) Telegram are working.
 
 ## Usage
 
@@ -127,6 +171,9 @@ See [clip_command.md](clip_command.md) and [clipping_agent_skills.md](clipping_a
 ├── video_clipper.md          # Pipeline directive / SOP
 ├── requirements.txt
 ├── .env.example
+├── .claude/
+│   └── commands/
+│       └── clip.md           # Claude Code slash command (auto-detected)
 └── .tmp/                     # Work directories (gitignored)
     └── <video_slug>/
         ├── state.json
