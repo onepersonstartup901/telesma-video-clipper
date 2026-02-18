@@ -403,7 +403,7 @@ def _cut_clip(video_path, clip, output_dir, skip_vertical=False):
     horiz_path = os.path.join(output_dir, f"{base_name}.mp4")
     vert_path = os.path.join(output_dir, f"{base_name}_vertical.mp4")
 
-    # Horizontal cut (original aspect ratio)
+    # Horizontal cut (source resolution, high quality for Drive)
     if not os.path.exists(horiz_path):
         cmd_h = [
             "ffmpeg",
@@ -412,7 +412,7 @@ def _cut_clip(video_path, clip, output_dir, skip_vertical=False):
             "-ss", str(fine_seek),
             "-t", str(duration),
             "-c:v", "libx264", "-c:a", "aac",
-            "-crf", "23",
+            "-crf", "18",
             "-avoid_negative_ts", "make_zero",
             "-y", horiz_path,
         ]
@@ -455,6 +455,45 @@ def _cut_clip(video_path, clip, output_dir, skip_vertical=False):
         print(f"    Vertical already exists, skipping")
 
     return horiz_path, vert_path
+
+
+def _make_telegram_copy(clip_path, tg_dir):
+    """Create a 720p downscaled copy of a clip for Telegram.
+
+    If the source is already 720p or smaller, copies at CRF 23 without scaling.
+    Returns the path to the Telegram-ready file.
+    """
+    os.makedirs(tg_dir, exist_ok=True)
+    out_path = os.path.join(tg_dir, os.path.basename(clip_path))
+    if os.path.exists(out_path):
+        return out_path
+
+    # Probe source height
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=height", "-of", "csv=p=0", clip_path],
+        capture_output=True, text=True,
+    )
+    try:
+        src_height = int(probe.stdout.strip())
+    except (ValueError, AttributeError):
+        src_height = 9999  # Assume large if probe fails
+
+    vf = "scale=-2:720" if src_height > 720 else None
+
+    cmd = ["ffmpeg", "-i", clip_path]
+    if vf:
+        cmd += ["-vf", vf]
+    cmd += [
+        "-c:v", "libx264", "-c:a", "aac",
+        "-crf", "23",
+        "-y", out_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        print(f"    [Telegram copy] ERROR: {result.stderr[-200:]}")
+        return clip_path  # Fall back to full-res file
+    return out_path
 
 
 def step_cut_draft(work_dir, state, skip_vertical=False):
@@ -550,6 +589,8 @@ def step_cut_all(work_dir, state, skip_vertical=False, max_workers=4):
     cut_count = 0
     errors = []
 
+    tg_dir = os.path.join(output_dir, "telegram")
+
     def _cut_one(clip_idx, clip):
         """Wrapper for ThreadPoolExecutor — returns (idx, clip, h, v)."""
         h, v = _cut_clip(video_path, clip, output_dir, skip_vertical=skip_vertical)
@@ -576,9 +617,12 @@ def step_cut_all(work_dir, state, skip_vertical=False, max_workers=4):
                     f"{start_fmt}–{end_fmt} ({duration:.0f}s) | "
                     f"{clip.get('virality_score', '?')}/10"
                 )
-                tg_queue.put((h_path, caption))
+                # Send 720p copy to Telegram, keep full-res for Drive
+                tg_path = _make_telegram_copy(h_path, tg_dir)
+                tg_queue.put((tg_path, caption))
                 if v_path:
-                    tg_queue.put((v_path, f"{caption}\n(vertical 9:16)"))
+                    tg_v = _make_telegram_copy(v_path, tg_dir)
+                    tg_queue.put((tg_v, f"{caption}\n(vertical 9:16)"))
             else:
                 errors.append(clip["id"])
                 print(f"  FAILED: #{clip['id']} {title}")
@@ -629,11 +673,11 @@ def step_upload(work_dir, state):
         folder_name = f"{base} – Clips"
         clips_folder_id = create_folder(service, folder_name)
 
-    # Upload all clip files
+    # Upload full-res clip files (skip telegram/ subfolder)
     clips_dir = os.path.join(work_dir, "clips")
     clip_files = sorted([
         f for f in os.listdir(clips_dir)
-        if f.endswith(".mp4")
+        if f.endswith(".mp4") and os.path.isfile(os.path.join(clips_dir, f))
     ])
 
     if not clip_files:
