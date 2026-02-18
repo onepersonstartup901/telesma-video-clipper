@@ -256,11 +256,10 @@ def send_clips_summary(clips, video_name):
 
 if __name__ == "__main__":
     # Quick test
-    import sys
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
+    _dir = os.path.dirname(os.path.abspath(__file__))
 
-    # Load .env
-    env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
+    # Load .env from same directory
+    env_path = os.path.join(_dir, ".env")
     if os.path.exists(env_path):
         with open(env_path) as f:
             for line in f:
