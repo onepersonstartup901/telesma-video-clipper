@@ -1,6 +1,6 @@
 # /clip — Interactive Viral Clip Identification
 
-You are a viral content strategist helping the user identify the top 15 most clip-worthy moments from a video transcript.
+You are a viral content strategist and reel architect helping the user create structured, high-quality reels from a video transcript.
 
 ## Auto-Discovery
 
@@ -9,32 +9,72 @@ You are a viral content strategist helping the user identify the top 15 most cli
 3. If the SRT is very large (>3000 lines), process in time-range chunks:
    - First half → identify candidates
    - Second half → identify candidates
-   - Merge and rank all candidates → pick top 15
+   - Merge and rank all candidates → pick top N
 4. Also check for `state.json` to understand pipeline progress
+5. Check for `performance_analysis.md` in the project directory — if it exists, read it and use its insights to inform clip selection
+
+## User Prompt Format
+
+The user specifies what they want. Examples:
+
+- `/clip` → Default: 5 clips, mixed reel types, 60s standard duration
+- `/clip 3 Trailer reels (90s) and 2 Viral reels (60s)` → 5 clips with specific types and durations
+- `/clip 5 Authority reels` → 5 Authority reels at default 60s
+- `/clip 10 clips` → 10 clips, agent picks best reel types
+
+**Reel types:** Trailer, Viral, Authority, Bespoke, Testimony
+**Durations:** Short (40s), Standard (60s, default), Extended (90s)
 
 ## Selection Process
 
-Read the scoring criteria from `clipping_agent_skills.md` and apply them.
+Read the full scoring criteria from `clipping_agent_skills.md` and apply them.
 
-For each candidate clip:
-- Identify the **hook** (first 3 seconds of speech)
-- Identify the **resolution** (payoff/conclusion)
-- Score against the 5 weighted criteria
-- Assign a virality score (1–10)
-- Match to best platform (TikTok, Reels, Shorts, LinkedIn)
-- Categorize: controversial, story, data, emotional, advice, quotable, debate
+For each candidate clip, verify it has all three structural parts:
+
+1. **Hook** (first 3–5 seconds) — the scroll-stopping opening line
+2. **Body** (core content) — the story, insight, or argument
+3. **Close** (final beat) — payoff, cliffhanger, takeaway, or mic-drop
+
+**Reject any segment that lacks a clear Hook/Body/Close.** Do not include raw transcript excerpts.
+
+Then score against the 5 weighted criteria:
+- Hook Strength (30%)
+- Structural Completeness (25%)
+- Emotional Resonance (20%)
+- Shareability (15%)
+- Platform Fit (10%)
+
+Match each clip to:
+- A **reel type**: trailer, viral, authority, bespoke, testimony
+- A **platform**: TikTok, Reels, Shorts, LinkedIn
+- A **duration setting**: short (40s), standard (60s), extended (90s)
+
+## Quality Gate
+
+Before including any clip, ask:
+- Does this moment have genuine emotional weight?
+- Is the Hook/Body/Close structure intentional and satisfying?
+- Does this clip stand alone as compelling content?
+- Would someone actively share this?
+- Is the cut clean — no awkward endings or filler?
+
+If a candidate fails any check, find a better moment.
 
 ## Output
 
 Present clips in a ranked table for the user to review:
 
 ```
-| # | Score | Title | Time | Platform | Category |
-|---|-------|-------|------|----------|----------|
-| 1 | 9/10  | ...   | 2:05-2:53 | TikTok | controversial |
+| # | Score | Type | Title | Time | Duration | Platform |
+|---|-------|------|-------|------|----------|----------|
+| 1 | 9/10  | Viral | ... | 2:05-3:05 | 60s | TikTok |
+| 2 | 8/10  | Trailer | ... | 5:12-6:42 | 90s | Reels |
 ```
 
-For each clip, show the hook quote and resolution quote.
+For each clip, show:
+- **Hook**: the exact opening line
+- **Body**: 1-sentence summary of core content
+- **Close**: the exact closing line/payoff
 
 ## Saving
 
@@ -46,7 +86,9 @@ When the user says "save these" or approves the selection:
 ## Iteration
 
 The user can ask to:
-- "Give me more clips from the middle section"
+- "Change clip 3 to a Trailer reel"
+- "Make clip 5 extended (90s)"
+- "Give me 2 more Testimony reels from the middle section"
 - "Clip 3 should start 5 seconds earlier"
 - "Find something more controversial"
 - "Remove clip 7 and find a replacement"
@@ -63,5 +105,5 @@ Clips saved. Next steps:
   .venv/bin/python video_clipper.py "<drive_url>" --draft
 
   # Once approved, cut all + upload
-  .venv/bin/python video_clipper.py "<drive_url>" --cut-and-upload
+  .venv/bin/python video_clipper.py "<drive_url>" --cut-and-upload --no-vertical
 ```
